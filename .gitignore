@@ -1,0 +1,14 @@
+# ignore these files/folders
+/.bundle/
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+.*
+# allow these files/folders
+!.gitignore
+!.rubocop.yml
+!.rubocop_airbnb.yml
+!.reek

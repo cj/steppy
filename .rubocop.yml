@@ -1,0 +1,18 @@
+inherit_from:
+  - .rubocop_airbnb.yml
+
+Metrics/LineLength:
+  Max: 100
+  IgnoredPatterns: ['#', 'ENV']
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+  SupportedStyles:
+    - always
+
+Style/StringLiterals:
+  Enabled: true
+
+AllCops:
+  TargetRubyVersion: 2.5
