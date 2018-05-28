@@ -16,3 +16,9 @@ Style/StringLiterals:
 
 AllCops:
   TargetRubyVersion: 2.5
+
+Airbnb/ClassOrModuleDeclaredInWrongFile:
+  Enabled: false
+
+Airbnb/ModuleMethodInWrongFile:
+  Enabled: false

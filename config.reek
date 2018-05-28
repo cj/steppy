@@ -1,0 +1,5 @@
+"test":
+  IrresponsibleModule:
+    enabled: false
+  InstanceVariableAssumption:
+    enabled: false
