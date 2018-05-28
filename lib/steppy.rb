@@ -12,28 +12,39 @@ module Steppy
 
   # Steppy class methods that will be added to your included classes.
   module ClassMethods
-    def step_set(*sets)
-      steppy[:sets] = *sets
+    if !defined? step
+      def step(method, **args)
+        steppy_add step_method: method, step_args: args
+      end
     end
 
-    def step(method, **args)
-      steppy_steps << { step_method: method, step_args: args }
+    if !defined? step_if
+      def step_if(condition, &block)
+        steppy_add step_if: condition, step_block: block
+      end
     end
 
-    def step_if(condition, &block)
-      steppy_steps << { step_if: condition, step_block: block }
+    if !defined? step_set
+      def step_set(*sets)
+        steppy_cache[:sets] = *sets
+      end
     end
 
-    def steppy
-      @steppy ||= SteppyCache.new(steps: nil, sets: [], block: nil)
+    def steppy_cache
+      @steppy_cache ||= SteppyCache.new(steps: nil, sets: [], block: nil)
     end
 
     def steppy_steps
-      steppy[:steps] ||= []
+      steppy_cache[:steps] ||= []
     end
 
-    def steps(&block)
-      steppy[:block] = block
+    def steppy_add(step)
+      steppy_steps.push(step)
+      steppy_cache
+    end
+
+    def steppy(&block)
+      steppy_cache[:block] = block
     end
   end
 
@@ -42,10 +53,9 @@ module Steppy
     def steppy(attributes)
       @steppy = { attributes: attributes.freeze }
 
-      steppy_run_sets
-      steppy_run_all
-
-      @steppy[:result]
+      steppy_run(
+        (steppy_class_block || steppy_class_cache).to_h
+      )
     end
 
     def steppy_attributes
@@ -54,16 +64,31 @@ module Steppy
 
     protected
 
-    def steppy_run_sets
-      self.class.steppy[:sets].each do |set|
+    def steppy_run(steps:, sets:, **)
+      steppy_run_sets(sets)
+      steppy_run_steps(steps)
+
+      @steppy[:result] || nil
+    end
+
+    def steppy_class_block
+      block = steppy_class_cache[:block]
+      block && steppy_class.instance_exec(&block)
+    end
+
+    def steppy_class_cache
+      self.class.steppy_cache
+    end
+
+    def steppy_run_sets(sets)
+      sets ||= steppy_class_cache[:sets]
+
+      sets.each do |set|
         steppy_set(set, steppy_attributes[set])
       end
     end
 
-    def steppy_run_all
-      steppy = self.class.steppy
-      steps = steppy[:steps] ||= steppy_class.instance_exec(&steppy[:block])
-
+    def steppy_run_steps(steps)
       steps.each do |step|
         @steppy[:result] = step.key?(:step_if) ? steppy_if_block(step) : steppy_step(step)
       end
@@ -106,9 +131,7 @@ module Steppy
                  instance_exec(&step_if)
                end
 
-      passed && steppy_class.instance_exec(&step_block).each do |step|
-        steppy_step(step)
-      end
+      passed && steppy_run(steppy_class.instance_exec(&step_block).to_h)
     end
 
     def steppy_class

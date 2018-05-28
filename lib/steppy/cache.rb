@@ -20,5 +20,9 @@ module Steppy
     def []=(key, value)
       @mutex.synchronize { @hash[key] = value }
     end
+
+    def to_h
+      @mutex.synchronize { @hash }
+    end
   end
 end
