@@ -18,10 +18,20 @@ class Register < RegisterBase
     step :set_user_role, if: -> { @user.role.nil? }
 
     step_if -> { @user.role == 'admin' } do
-      step :do_admin_things
+      step(:do_admin_things) { @admin = true }
     end
 
-    step :send_welcome_email
+    step :send_welcome_email do |first_name:, last_name:, **params|
+      # send email
+
+      {
+        first_name: first_name,
+        last_name: last_name,
+        user: @user,
+        email_sent: true,
+        admin: @admin,
+      }
+    end
   end
 
   def step_create_user(first_name:, last_name:, **params)
@@ -30,20 +40,6 @@ class Register < RegisterBase
 
   def step_set_user_role
     @user.role = 'basic'
-  end
-
-  def step_do_admin_things
-    @admin = true
-  end
-
-  def step_send_welcome_email
-    # send email
-
-    {
-      user: @user,
-      email_sent: true,
-      admin: @admin,
-    }
   end
 
   User = Struct.new(:first_name, :last_name, :email, :role)

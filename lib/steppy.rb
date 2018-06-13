@@ -13,8 +13,8 @@ module Steppy
   # Steppy class methods that will be added to your included classes.
   module ClassMethods
     if !defined? step
-      def step(method, **args)
-        steppy_add step_method: method, step_args: args
+      def step(method, **args, &block)
+        steppy_add step_method: method, step_args: args, step_block: block
       end
     end
 
@@ -50,7 +50,8 @@ module Steppy
 
   # Steppy instance methods that will be added.
   module InstanceMethods
-    def steppy(attributes)
+    def steppy(attributes, prefix: :step)
+      @steppy_prefix = prefix
       @steppy = { attributes: attributes.freeze }
 
       steppy_run(
@@ -94,18 +95,34 @@ module Steppy
       end
     end
 
-    def steppy_step(step_method:, step_args:)
-      method_name = "step_#{step_method}"
+    def steppy_step(step_method:, step_args:, step_block:)
+      method_name = "#{@steppy_prefix}_#{step_method}"
 
       steppy_if(step_args[:if]) && return
 
-      if method(method_name).arity > 0
-        result = public_send(method_name, steppy_attributes)
-      else
-        result = public_send(method_name)
-      end
+      result = if step_block
+                 steppy_run_block(step_block, steppy_attributes)
+               else
+                 steppy_run_method(method_name, steppy_attributes)
+               end
 
       steppy_set(step_args[:set], result)
+    end
+
+    def steppy_run_method(method_name, steppy_attributes)
+      if method(method_name).arity > 0
+        public_send(method_name, steppy_attributes)
+      else
+        public_send(method_name)
+      end
+    end
+
+    def steppy_run_block(step_block, steppy_attributes)
+      if step_block.arity > 0
+        instance_exec(steppy_attributes, &step_block)
+      else
+        instance_exec(&step_block)
+      end
     end
 
     def steppy_if(step_if)
