@@ -105,4 +105,28 @@ class SteppyTest < Minitest::Test
     klass.new.steppy(value: 'foo').must_equal 'bar'
     klass.new.steppy(value: 'bar').must_be_nil
   end
+
+  test 'only run prefix' do
+    klass = Class.new do
+      include Steppy
+
+      step :set_foo, set: :foo
+      step :set_bar, set: :bar, prefix: :filter
+      step :return_result
+
+      def step_set_foo
+        'foo'
+      end
+
+      def filter_set_bar
+        'bar'
+      end
+
+      def step_return_result
+        { foo: @foo, bar: @bar }
+      end
+    end
+
+    klass.new.steppy({}, prefix: :filter).must_be_nil
+  end
 end

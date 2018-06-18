@@ -14,6 +14,7 @@ module Steppy
   module ClassMethods
     if !defined? step
       def step(method, **args, &block)
+        args[:prefix] ||= :step
         steppy_add step_method: method, step_args: args, step_block: block
       end
     end
@@ -96,9 +97,11 @@ module Steppy
     end
 
     def steppy_step(step_method:, step_args:, step_block:)
-      method_name = "#{@steppy_prefix}_#{step_method}"
+      if steppy_if(step_args[:if]) || @steppy_prefix != step_args[:prefix]
+        return
+      end
 
-      steppy_if(step_args[:if]) && return
+      method_name = "#{@steppy_prefix}_#{step_method}"
 
       result = if step_block
                  steppy_run_block(step_block, steppy_attributes)
@@ -120,8 +123,7 @@ module Steppy
     def steppy_run_block(step_block, steppy_attributes)
       if step_block.arity > 0
         instance_exec(steppy_attributes, &step_block)
-      else
-        instance_exec(&step_block)
+      else instance_exec(&step_block)
       end
     end
 
