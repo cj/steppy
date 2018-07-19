@@ -129,4 +129,12 @@ class SteppyTest < Minitest::Test
 
     klass.new.steppy({}, prefix: :filter).must_be_nil
   end
+
+  test 'having no steps should not throw an error' do
+    klass = Class.new do
+      include Steppy
+    end
+
+    klass.new.steppy(foo: 'bar').must_be_nil
+  end
 end

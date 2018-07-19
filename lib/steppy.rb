@@ -91,6 +91,10 @@ module Steppy
     end
 
     def steppy_run_steps(steps)
+      if !steps
+        return
+      end
+
       steps.each do |step|
         @steppy[:result] = step.key?(:step_if) ? steppy_if_block(step) : steppy_step(step)
       end
