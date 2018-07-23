@@ -137,4 +137,16 @@ class SteppyTest < Minitest::Test
 
     klass.new.steppy(foo: 'bar').must_be_nil
   end
+
+  test 'it should raise a SteppyError' do
+    klass = Class.new do
+      include Steppy
+
+      step :foo do
+        raise SteppyError
+      end
+    end
+
+    -> { klass.new.steppy({}) }.must_raise SteppyError
+  end
 end

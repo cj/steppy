@@ -2,6 +2,7 @@
 
 require 'steppy/version'
 require 'steppy/cache'
+require 'steppy/error'
 
 # The Steppy module you'll include in your classes to give them steps!
 module Steppy
