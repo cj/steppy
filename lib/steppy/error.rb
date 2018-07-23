@@ -1,4 +1,18 @@
 # frozen_string_literal: true
 
 # Incase you need to throw an error related to steppy
-class SteppyError < StandardError; end
+class SteppyError < StandardError
+  attr_reader :step
+  # rubocop:disable Airbnb/OptArgParameters
+  def initialize(step = nil)
+    # rubocop:enable Airbnb/OptArgParameters
+    if step
+      @step = step
+      message = step.to_json
+    else
+      message = 'Steppy Failed!'
+    end
+
+    super(message)
+  end
+end
