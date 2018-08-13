@@ -16,13 +16,27 @@ module Steppy
     if !defined? step
       def step(method, **args, &block)
         args[:prefix] ||= :step
-        steppy_add step_method: method, step_args: args, step_block: block
+
+        steppy_add(
+          step_method: method,
+          step_args: args,
+          step_block: block,
+        )
       end
     end
 
     if !defined? step_if
       def step_if(condition, &block)
         steppy_add step_if: condition, step_block: block
+      end
+    end
+
+    if !defined? step_unless
+      def step_unless(condition, &block)
+        steppy_add(
+          step_if: -> { !steppy_run_block(condition) },
+          step_block: block,
+        )
       end
     end
 
@@ -91,14 +105,22 @@ module Steppy
       end
     end
 
-    def steppy_run_steps(steps)
-      if !steps
-        return
-      end
+    def steppy_run_step(step)
+      step_method = step[:step_method]
 
-      steps.each do |step|
-        @steppy[:result] = step.key?(:step_if) ? steppy_if_block(step) : steppy_step(step)
+      if step.key?(:step_if)
+        steppy_if_block(step)
+      elsif step_method.is_a? Proc
+        steppy_run_block(step_method)
+      else
+        steppy_step(step)
       end
+    end
+
+    def steppy_run_steps(steps)
+      return if !steps
+
+      steps.each { |step| @steppy[:result] = steppy_run_step(step) }
     end
 
     def steppy_step(step_method:, step_args:, step_block:)
@@ -109,15 +131,15 @@ module Steppy
       method_name = "#{@steppy_prefix}_#{step_method}"
 
       result = if step_block
-                 steppy_run_block(step_block, steppy_attributes)
+                 steppy_run_block(step_block)
                else
-                 steppy_run_method(method_name, steppy_attributes)
+                 steppy_run_method(method_name)
                end
 
       steppy_set(step_args[:set], result)
     end
 
-    def steppy_run_method(method_name, steppy_attributes)
+    def steppy_run_method(method_name)
       if method(method_name).arity > 0
         public_send(method_name, steppy_attributes)
       else
@@ -125,10 +147,11 @@ module Steppy
       end
     end
 
-    def steppy_run_block(step_block, steppy_attributes)
+    def steppy_run_block(step_block)
       if step_block.arity > 0
         instance_exec(steppy_attributes, &step_block)
-      else instance_exec(&step_block)
+      else
+        instance_exec(&step_block)
       end
     end
 

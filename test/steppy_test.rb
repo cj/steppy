@@ -143,14 +143,36 @@ class SteppyTest < Minitest::Test
       include Steppy
 
       step :foo do
-        raise SteppyError.new({
+        raise SteppyError, {
           bar: 'foo',
-        })
+        }
       end
     end
 
     error = -> { klass.new.steppy({}) }.must_raise SteppyError
     error.step[:bar].must_equal 'foo'
     error.message.must_equal error.step.to_json
+  end
+
+  test '#unless' do
+    klass = Class.new do
+      include Steppy
+
+      step :foo, unless: -> { @bar }, set: :foo
+      step_unless -> { @bar } do
+        step :set_bar, set: :bar
+      end
+      step ->(baz:) { @foo + @bar + baz }
+
+      def step_foo
+        'foo'
+      end
+
+      def step_set_bar
+        'bar'
+      end
+    end
+
+    klass.new.steppy(baz: 'baz').must_equal 'foobarbaz'
   end
 end

@@ -9,8 +9,6 @@ class SteppyError < StandardError
     if step
       @step = step
       message = step.to_json
-    else
-      message = 'Steppy Failed!'
     end
 
     super(message)
