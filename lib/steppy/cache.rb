@@ -24,5 +24,9 @@ module Steppy
     def to_h
       @mutex.synchronize { @hash }
     end
+
+    def method_missing(method, *args, &block)
+      @mutex.synchronize { @hash.public_send(method, *args, &block) }
+    end
   end
 end

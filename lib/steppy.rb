@@ -11,178 +11,147 @@ module Steppy
     base.include InstanceMethods
   end
 
+  def self.parse_args!(args)
+    if args.key?(:if)
+      args[:condition] = args.delete(:if)
+    end
+
+    if args.key?(:unless)
+      args[:condition] = -> { !steppy_run_condition(args.delete(:unless)) }
+    end
+  end
+
   # Steppy class methods that will be added to your included classes.
   module ClassMethods
-    if !defined? step
-      def step(method, **args, &block)
-        args[:prefix] ||= :step
-
-        steppy_add(
-          step_method: method,
-          step_args: args,
-          step_block: block,
-        )
-      end
-    end
-
-    if !defined? step_if
-      def step_if(condition, &block)
-        steppy_add step_if: condition, step_block: block
-      end
-    end
-
-    if !defined? step_unless
-      def step_unless(condition, &block)
-        steppy_add(
-          step_if: -> { !steppy_run_block(condition) },
-          step_block: block,
-        )
-      end
-    end
-
-    if !defined? step_set
-      def step_set(*sets)
-        steppy_cache[:sets] = *sets
-      end
+    def steppy(&block)
+      steppy_cache[:klass] = Class.new { include Steppy }.instance_eval(&block)
     end
 
     def steppy_cache
-      @steppy_cache ||= SteppyCache.new(steps: nil, sets: [], block: nil)
+      @steppy_cache ||= SteppyCache.new(steps: [], sets: [], rescues: [])
     end
 
-    def steppy_steps
-      steppy_cache[:steps] ||= []
+    def step_set(*sets)
+      steppy_cache[:sets] += sets
     end
 
-    def steppy_add(step)
-      steppy_steps.push(step)
-      steppy_cache
+    def step(method = nil, args = {}, &block) # rubocop:disable Airbnb/OptArgParameters
+      if method.is_a?(Proc)
+        block = method
+        method = nil
+      end
+
+      Steppy.parse_args!(args)
+
+      steppy_cache[:steps].push(
+        method: method,
+        args: args,
+        block: block,
+      )
+
+      self
     end
 
-    def steppy(&block)
-      steppy_cache[:block] = block
+    def step_if(condition, &block)
+      steppy_cache[:steps].push(condition: condition, block: block)
+      self
+    end
+
+    def step_unless(condition, &block)
+      steppy_cache[:steps].push(condition: -> { !steppy_run_condition(condition) }, block: block)
+      self
     end
   end
 
   # Steppy instance methods that will be added.
   module InstanceMethods
-    def steppy(attributes, prefix: :step)
-      @steppy_prefix = prefix
-      @steppy = { attributes: attributes.freeze }
+    attr_reader :steppy_attributes, :steppy_result
 
-      steppy_run(
-        (steppy_class_block || steppy_class_cache).to_h
-      )
+    def steppy(attributes, cache = {})
+      @steppy_attributes = attributes
+
+      if steppy_cache.key?(:klass)
+        return steppy_cache[:klass].new.steppy(attributes, { context: self })
+      else
+        steppy_cache.merge!({ prefix: :step, context: self }).merge!(cache)
+      end
+
+      steppy_run(steppy_cache)
     end
-
-    def steppy_attributes
-      @steppy[:attributes]
-    end
-
-    protected
 
     def steppy_run(steps:, sets:, **)
       steppy_run_sets(sets)
       steppy_run_steps(steps)
 
-      @steppy[:result] || nil
-    end
-
-    def steppy_class_block
-      block = steppy_class_cache[:block]
-      block && steppy_class.instance_exec(&block)
-    end
-
-    def steppy_class_cache
-      self.class.steppy_cache
+      steppy_result
     end
 
     def steppy_run_sets(sets)
-      sets ||= steppy_class_cache[:sets]
-
-      sets.each do |set|
-        steppy_set(set, steppy_attributes[set])
-      end
+      sets.each { |key, value| steppy_set(key, value || steppy_attributes[key]) }
     end
 
-    def steppy_run_step(step)
-      step_method = step[:step_method]
-
-      if step.key?(:step_if)
-        steppy_if_block(step)
-      elsif step_method.is_a? Proc
-        steppy_run_block(step_method)
-      else
-        steppy_step(step)
-      end
+    def steppy_set(key, value)
+      key && steppy_instance.instance_variable_set("@#{key}", value)
     end
 
     def steppy_run_steps(steps)
-      return if !steps
+      steps.each do |step|
+        condition = step[:condition]
 
-      steps.each { |step| @steppy[:result] = steppy_run_step(step) }
-    end
-
-    def steppy_step(step_method:, step_args:, step_block:)
-      if steppy_if(step_args[:if]) || @steppy_prefix != step_args[:prefix]
-        return
+        @steppy_result = if condition
+          steppy_run_condition_block(condition, step[:block])
+        else
+          steppy_run_step(step)
+        end
       end
-
-      method_name = "#{@steppy_prefix}_#{step_method}"
-
-      result = if step_block
-                 steppy_run_block(step_block)
-               else
-                 steppy_run_method(method_name)
-               end
-
-      steppy_set(step_args[:set], result)
     end
 
-    def steppy_run_method(method_name)
-      if method(method_name).arity > 0
-        public_send(method_name, steppy_attributes)
+    def steppy_run_condition_block(condition, block)
+      if steppy_run_condition(condition)
+        steppy_run(Class.new { include Steppy }.instance_exec(&block).steppy_cache)
+      end
+    end
+
+    def steppy_run_condition(condition)
+      return true unless condition
+
+      if condition.arity > 0
+        steppy_instance.instance_exec(steppy_attributes, &condition)
       else
-        public_send(method_name)
+        steppy_instance.instance_exec(&condition)
       end
     end
 
-    def steppy_run_block(step_block)
-      if step_block.arity > 0
-        instance_exec(steppy_attributes, &step_block)
+    def steppy_run_step(method:, args:, block:)
+      return unless steppy_run_condition(args[:condition])
+
+      result = if block
+        steppy_instance.instance_exec(steppy_attributes, &block)
       else
-        instance_exec(&step_block)
+        steppy_run_method(method, steppy_attributes)
       end
-    end
 
-    def steppy_if(step_if)
-      return unless step_if
-
-      if step_if.arity > 0
-        !instance_exec(steppy_attributes, &step_if)
-      else
-        !instance_exec(&step_if)
-      end
-    end
-
-    def steppy_set(step_set, result)
-      step_set && instance_variable_set("@#{step_set}", result)
+      steppy_set(args[:set], result)
 
       result
     end
 
-    def steppy_if_block(step_if:, step_block:)
-      passed = if step_if.arity > 0
-                 instance_exec(steppy_attributes, &step_if)
-               else
-                 instance_exec(&step_if)
-               end
+    def steppy_run_method(method_name, attributes)
+      method = "#{steppy_cache[:prefix]}_#{method_name}"
 
-      passed && steppy_run(steppy_class.instance_exec(&step_block).to_h)
+      if steppy_instance.method(method).arity > 0
+        steppy_instance.public_send(method, attributes)
+      else
+        steppy_instance.public_send(method)
+      end
     end
 
-    def steppy_class
-      Class.new { include Steppy }
+    def steppy_cache
+      @steppy_cache ||= SteppyCache.new(self.class.steppy_cache.to_h)
+    end
+
+    def steppy_instance
+      @stepp_context ||= steppy_cache[:context] || self
     end
   end
 end

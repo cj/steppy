@@ -22,3 +22,6 @@ Airbnb/ClassOrModuleDeclaredInWrongFile:
 
 Airbnb/ModuleMethodInWrongFile:
   Enabled: false
+
+Lint/EndAlignment:
+  EnforcedStyleAlignWith: variable
