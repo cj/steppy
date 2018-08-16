@@ -197,4 +197,16 @@ class SteppyTest < Minitest::Test
     error = -> { klass.new.steppy({}) }.must_raise SteppyError
     error.message.must_equal 'o noes'
   end
+
+  test 'allow to wrap in a steppy block' do
+    klass = Class.new do
+      include Steppy
+
+      steppy do
+        step { 'foo' }
+      end
+    end
+
+    klass.new.steppy({}).must_equal 'foo'
+  end
 end

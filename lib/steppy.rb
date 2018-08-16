@@ -25,8 +25,8 @@ module Steppy
 
   # Steppy class methods that will be added to your included classes.
   module ClassMethods
-    def steppy_cache
-      @steppy_cache ||= SteppyCache.new(steps: [], sets: [], rescues: [])
+    def steppy(&block)
+      steppy_cache[:block] = block
     end
 
     def step_set(*sets)
@@ -63,26 +63,32 @@ module Steppy
       steppy_cache[:rescues].push(exceptions: exceptions, block: block)
       self
     end
+
+    def steppy_cache
+      @steppy_cache ||= SteppyCache.new(steps: [], sets: [], rescues: [])
+    end
   end
 
   # Steppy instance methods that will be added.
   module InstanceMethods
-    attr_reader :steppy_attributes, :steppy_result
+    attr_reader :steppy_cache
 
     def steppy(attributes, cache = {})
-      @steppy_attributes = attributes
+      steppy_initialize_cache({ attributes: attributes, prefix: :step }.merge(cache))
 
-      steppy_cache.merge!({ prefix: :step }).merge!(cache)
-
-      steppy_run(steppy_cache)
+      if steppy_cache.key?(:block)
+        instance_exec(&steppy_cache[:block])
+      else
+        steppy_run(steppy_cache)
+      end
+    rescue => exception
+      steppy_rescue exception, steppy_cache[:rescues]
     end
 
     def steppy_run(steps:, sets:, **)
       sets.each { |key, value| steppy_set(key, value || steppy_attributes[key]) }
 
       steppy_steps(steps)
-    rescue => exception
-      steppy_rescue exception, steppy_cache[:rescues]
     end
 
     def steppy_set(key, value)
@@ -93,7 +99,7 @@ module Steppy
       steps.each do |step|
         condition = step[:condition]
 
-        @steppy_result = if condition
+        steppy_cache[:result] = if condition
           steppy_run_condition_block(condition, step[:block])
         else
           steppy_run_step(step)
@@ -112,7 +118,7 @@ module Steppy
 
       rescues.each do |exceptions:, block:|
         if !exceptions || (exceptions && !exceptions.include?(exception_class))
-          @steppy_result = instance_exec(steppy_attributes, &block)
+          steppy_cache[:result] = instance_exec(steppy_attributes, &block)
         end
       end
 
@@ -121,7 +127,7 @@ module Steppy
 
     def steppy_run_condition_block(condition, block)
       if steppy_run_condition(condition)
-        steppy_run(Class.new { include Steppy }.instance_exec(&block).steppy_cache)
+        steppy_run(steppy_cache_from_block(block))
       end
     end
 
@@ -159,8 +165,22 @@ module Steppy
       end
     end
 
-    def steppy_cache
-      @steppy_cache ||= SteppyCache.new(self.class.steppy_cache.to_h)
+    def steppy_cache_from_block(block)
+      Class.new { include Steppy }.instance_exec(&block).steppy_cache
+    end
+
+    def steppy_initialize_cache(cache)
+      @steppy_cache = SteppyCache.new(
+        self.class.steppy_cache.to_h.merge(result: nil).merge(cache)
+      )
+    end
+
+    def steppy_attributes
+      steppy_cache[:attributes]
+    end
+
+    def steppy_result
+      steppy_cache[:result]
     end
   end
 end
