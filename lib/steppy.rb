@@ -11,7 +11,7 @@ module Steppy
     base.include InstanceMethods
   end
 
-  def self.parse_args!(args)
+  def self.parse_args(args)
     if args.key?(:if)
       args[:condition] = args.delete(:if)
     end
@@ -19,14 +19,12 @@ module Steppy
     if args.key?(:unless)
       args[:condition] = -> { !steppy_run_condition(args.delete(:unless)) }
     end
+
+    args
   end
 
   # Steppy class methods that will be added to your included classes.
   module ClassMethods
-    def steppy(&block)
-      steppy_cache[:klass] = Class.new { include Steppy }.instance_eval(&block)
-    end
-
     def steppy_cache
       @steppy_cache ||= SteppyCache.new(steps: [], sets: [], rescues: [])
     end
@@ -41,16 +39,15 @@ module Steppy
         method = nil
       end
 
-      Steppy.parse_args!(args)
-
       steppy_cache[:steps].push(
         method: method,
-        args: args,
+        args: Steppy.parse_args(args),
         block: block,
       )
 
       self
     end
+    alias stepy_return step
 
     def step_if(condition, &block)
       steppy_cache[:steps].push(condition: condition, block: block)
@@ -59,6 +56,11 @@ module Steppy
 
     def step_unless(condition, &block)
       steppy_cache[:steps].push(condition: -> { !steppy_run_condition(condition) }, block: block)
+      self
+    end
+
+    def step_rescue(exceptions = nil, &block) # rubocop:disable Airbnb/OptArgParameters
+      steppy_cache[:rescues].push(exceptions: exceptions, block: block)
       self
     end
   end
@@ -70,31 +72,24 @@ module Steppy
     def steppy(attributes, cache = {})
       @steppy_attributes = attributes
 
-      if steppy_cache.key?(:klass)
-        return steppy_cache[:klass].new.steppy(attributes, { context: self })
-      else
-        steppy_cache.merge!({ prefix: :step, context: self }).merge!(cache)
-      end
+      steppy_cache.merge!({ prefix: :step }).merge!(cache)
 
       steppy_run(steppy_cache)
     end
 
     def steppy_run(steps:, sets:, **)
-      steppy_run_sets(sets)
-      steppy_run_steps(steps)
-
-      steppy_result
-    end
-
-    def steppy_run_sets(sets)
       sets.each { |key, value| steppy_set(key, value || steppy_attributes[key]) }
+
+      steppy_steps(steps)
+    rescue => exception
+      steppy_rescue exception, steppy_cache[:rescues]
     end
 
     def steppy_set(key, value)
-      key && steppy_instance.instance_variable_set("@#{key}", value)
+      key && instance_variable_set("@#{key}", value)
     end
 
-    def steppy_run_steps(steps)
+    def steppy_steps(steps)
       steps.each do |step|
         condition = step[:condition]
 
@@ -104,6 +99,24 @@ module Steppy
           steppy_run_step(step)
         end
       end
+
+      steppy_result
+    end
+
+    def steppy_rescue(exception, rescues)
+      exception_class = exception.class
+
+      if exception_class == SteppyError || rescues.empty?
+        raise exception
+      end
+
+      rescues.each do |exceptions:, block:|
+        if !exceptions || (exceptions && !exceptions.include?(exception_class))
+          @steppy_result = instance_exec(steppy_attributes, &block)
+        end
+      end
+
+      steppy_result
     end
 
     def steppy_run_condition_block(condition, block)
@@ -116,9 +129,9 @@ module Steppy
       return true unless condition
 
       if condition.arity > 0
-        steppy_instance.instance_exec(steppy_attributes, &condition)
+        instance_exec(steppy_attributes, &condition)
       else
-        steppy_instance.instance_exec(&condition)
+        instance_exec(&condition)
       end
     end
 
@@ -126,7 +139,7 @@ module Steppy
       return unless steppy_run_condition(args[:condition])
 
       result = if block
-        steppy_instance.instance_exec(steppy_attributes, &block)
+        instance_exec(steppy_attributes, &block)
       else
         steppy_run_method(method, steppy_attributes)
       end
@@ -139,19 +152,15 @@ module Steppy
     def steppy_run_method(method_name, attributes)
       method = "#{steppy_cache[:prefix]}_#{method_name}"
 
-      if steppy_instance.method(method).arity > 0
-        steppy_instance.public_send(method, attributes)
+      if method(method).arity > 0
+        public_send(method, attributes)
       else
-        steppy_instance.public_send(method)
+        public_send(method)
       end
     end
 
     def steppy_cache
       @steppy_cache ||= SteppyCache.new(self.class.steppy_cache.to_h)
-    end
-
-    def steppy_instance
-      @stepp_context ||= steppy_cache[:context] || self
     end
   end
 end

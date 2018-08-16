@@ -11,27 +11,25 @@ class RegisterBase
 end
 
 class Register < RegisterBase
-  steppy do
-    step_set :email
+  step_set :email
 
-    step :create_user, set: :user
-    step :set_user_role, if: -> { @user.role.nil? }
+  step :create_user, set: :user
+  step :set_user_role, if: -> { @user.role.nil? }
 
-    step_if -> { @user.role == 'admin' } do
-      step(:do_admin_things) { @admin = true }
-    end
+  step_if -> { @user.role == 'admin' } do
+    step(:do_admin_things) { @admin = true }
+  end
 
-    step :send_welcome_email do |first_name:, last_name:, **params|
-      # send email
+  step :send_welcome_email do |first_name:, last_name:, **params|
+    # send email
 
-      {
-        first_name: first_name,
-        last_name: last_name,
-        user: @user,
-        email_sent: true,
-        admin: @admin,
-      }
-    end
+    {
+      first_name: first_name,
+      last_name: last_name,
+      user: @user,
+      email_sent: true,
+      admin: @admin,
+    }
   end
 
   def step_create_user(first_name:, last_name:, **params)
@@ -140,8 +138,8 @@ class SteppyTest < Minitest::Test
     end
 
     error = -> { klass.new.steppy({}) }.must_raise SteppyError
-    error.step[:bar].must_equal 'foo'
-    error.message.must_equal error.step.to_json
+    error.steppy[:bar].must_equal 'foo'
+    error.message.must_equal error.steppy.to_json
   end
 
   test '#unless' do
@@ -174,5 +172,29 @@ class SteppyTest < Minitest::Test
     end
 
     klass.new.steppy(bar: 'bar').must_equal 'foobar'
+  end
+
+  test 'rescue' do
+    klass = Class.new do
+      include Steppy
+
+      step { raise 'o noes' }
+      step_rescue { |args| "#{args.to_json} error raised" }
+    end
+
+    args = { bar: 'bar' }
+    klass.new.steppy(args).must_equal "#{args.to_json} error raised"
+  end
+
+  test 'do no rescue SteppyError\'s' do
+    klass = Class.new do
+      include Steppy
+
+      step { raise SteppyError, 'o noes' }
+      step_rescue { |args| "#{args.to_json} error raised" }
+    end
+
+    error = -> { klass.new.steppy({}) }.must_raise SteppyError
+    error.message.must_equal 'o noes'
   end
 end
