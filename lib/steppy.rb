@@ -11,7 +11,8 @@ module Steppy
     base.include InstanceMethods
   end
 
-  def self.parse_args(args)
+  # :reek:TooManyStatements
+  def self.parse_step(method:, args:, block:)
     if args.key?(:if)
       args[:condition] = args.delete(:if)
     end
@@ -20,7 +21,12 @@ module Steppy
       args[:condition] = -> { !steppy_run_condition(args.delete(:unless)) }
     end
 
-    args
+    if method.is_a?(Proc)
+      block = method
+      method = nil
+    end
+
+    { method: method, args: args, block: block }
   end
 
   # Steppy class methods that will be added to your included classes.
@@ -34,17 +40,9 @@ module Steppy
     end
 
     def step(method = nil, args = {}, &block) # rubocop:disable Airbnb/OptArgParameters
-      if method.is_a?(Proc)
-        block = method
-        method = nil
-      end
-
       steppy_cache[:steps].push(
-        method: method,
-        args: Steppy.parse_args(args),
-        block: block,
+        Steppy.parse_step({ method: method, args: args, block: block })
       )
-
       self
     end
     alias stepy_return step
@@ -85,10 +83,36 @@ module Steppy
       steppy_rescue exception, steppy_cache[:rescues]
     end
 
-    def steppy_run(steps:, sets:, **)
-      sets.each { |key, value| steppy_set(key, value || steppy_attributes[key]) }
+    def step_set(*sets)
+      steppy_sets(sets)
+    end
 
+    def step(method = nil, args = {}, &block) # rubocop:disable Airbnb/OptArgParameters
+      steppy_run_step Steppy.parse_step({ method: method, args: args, block: block })
+    end
+    alias stepy_return step
+
+    def step_if(condition, &block)
+      steppy_run_condition_block condition, block
+    end
+
+    def step_unless(condition, &block)
+      steppy_run_condition_block -> { !steppy_run_condition(condition) }, block
+    end
+
+    def step_rescue(*)
+      raise '#step_rescue can not be used in a block, please just add rescue to the #steppy block.'
+    end
+
+    protected
+
+    def steppy_run(steps:, sets:, **)
+      steppy_sets(sets)
       steppy_steps(steps)
+    end
+
+    def steppy_sets(sets)
+      sets.each { |key, value| steppy_set(key, value || steppy_attributes[key]) }
     end
 
     def steppy_set(key, value)

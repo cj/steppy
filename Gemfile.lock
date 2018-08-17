@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    steppy (0.6.0)
+    steppy (0.7.0)
 
 GEM
   remote: https://rubygems.org/
@@ -23,8 +23,6 @@ GEM
     ice_nine (0.11.2)
     json (2.1.0)
     minitest (5.11.3)
-    minitest-line (0.6.5)
-      minitest (~> 5.0)
     parallel (1.12.1)
     parser (2.5.1.2)
       ast (~> 2.4.0)
@@ -68,7 +66,6 @@ DEPENDENCIES
   bundler (~> 1.16)
   byebug
   minitest (~> 5.1)
-  minitest-line
   rake (~> 10.0)
   reek (~> 4.8.1)
   rubocop (~> 0.52.1)
