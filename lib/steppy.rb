@@ -21,6 +21,8 @@ module Steppy
       args[:condition] = -> { !steppy_run_condition(args.delete(:unless)) }
     end
 
+    args[:prefix] = :step unless args.key?(:prefix)
+
     if method.is_a?(Proc)
       block = method
       method = nil
@@ -45,7 +47,7 @@ module Steppy
       )
       self
     end
-    alias stepy_return step
+    alias step_return step
 
     def step_if(condition, &block)
       steppy_cache[:steps].push(condition: condition, block: block)
@@ -90,7 +92,7 @@ module Steppy
     def step(method = nil, args = {}, &block) # rubocop:disable Airbnb/OptArgParameters
       steppy_run_step Steppy.parse_step({ method: method, args: args, block: block })
     end
-    alias stepy_return step
+    alias step_return step
 
     def step_if(condition, &block)
       steppy_run_condition_block condition, block
@@ -166,7 +168,11 @@ module Steppy
     end
 
     def steppy_run_step(method:, args:, block:)
-      return unless steppy_run_condition(args[:condition])
+      if !steppy_run_condition(args[:condition]) || (
+          steppy_cache[:prefix] != args[:prefix]
+      )
+        return steppy_result
+      end
 
       result = if block
         instance_exec(steppy_attributes, &block)

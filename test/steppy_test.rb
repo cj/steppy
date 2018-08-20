@@ -108,7 +108,9 @@ class SteppyTest < Minitest::Test
     klass = Class.new do
       include Steppy
 
-      step :set_bar, set: :bar
+      step :set_foo, set: :foo
+      step :set_bar, set: :bar, prefix: :filter
+      step_return { 'foo' }
 
       def filter_set_bar
         'bar'
