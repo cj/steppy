@@ -144,6 +144,24 @@ module Steppy
 
     alias step_return step
 
+    def step_if_else(condition_block, step_steps, args = {})
+      if_step, else_step = step_steps
+
+      steppy_run_step Steppy.parse_step(
+        method: if_step,
+        args: {
+          if: condition_block,
+        }.merge(args)
+      )
+
+      steppy_run_step Steppy.parse_step(
+        method: else_step,
+        args: {
+          unless: condition_block,
+        }.merge(args)
+      )
+    end
+
     def step_if(condition, &block)
       steppy_run_condition_block condition, block
     end
