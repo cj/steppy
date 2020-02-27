@@ -292,6 +292,10 @@ class SteppyTest < Minitest::Test
 
       step_after { puts 'after:global' }
 
+      step_after :does_not_exist do
+        puts 'after:does_not_exist'
+      end
+
       def step_initialize_current_user
         'current_user'
       end
@@ -305,6 +309,54 @@ class SteppyTest < Minitest::Test
     output.must_include 'before:global'
     output.must_include 'after:current_user'
     output.must_include 'after:global'
+
+    output.wont_include 'after:does_not_exist'
+
+    error.must_be_empty
+  end
+
+  test 'step callbacks inside steppy block' do
+    klass = Class.new do
+      include Steppy
+
+      attr_reader :current_user
+
+      steppy do
+        step :initialize_current_user
+      end
+
+      step_before { puts 'before:global' }
+
+      step_before :initialize_current_user do |_args|
+        puts 'before:initialize_current_user'
+      end
+
+      step_after :initialize_current_user do |result|
+        puts "after:#{result}"
+      end
+
+      step_after { puts 'after:global' }
+
+      step_after :does_not_exist do
+        puts 'after:does_not_exist'
+      end
+
+
+      def step_initialize_current_user
+        'current_user'
+      end
+    end
+
+    output, error = capture_io do
+      klass.new.steppy
+    end
+
+    output.must_include 'before:initialize_current_user'
+    output.must_include 'before:global'
+    output.must_include 'after:current_user'
+    output.must_include 'after:global'
+
+    output.wont_include 'after:does_not_exist'
 
     error.must_be_empty
   end
