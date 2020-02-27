@@ -6,6 +6,7 @@
 /pkg/
 /spec/reports/
 /tmp/
+tags
 .*
 # allow these files/folders
 !.gitignore

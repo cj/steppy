@@ -12,13 +12,13 @@ module Steppy
   end
 
   # :reek:TooManyStatements
-  def self.parse_step(method:, args:, block:)
+  def self.parse_step(method:, args:, block: nil)
     if args.key?(:if)
-      args[:condition] = args.delete(:if)
+      args[:condition] = -> { steppy_run_condition(args[:if]) }
     end
 
     if args.key?(:unless)
-      args[:condition] = -> { !steppy_run_condition(args.delete(:unless)) }
+      args[:condition] = -> { !steppy_run_condition(args[:unless]) }
     end
 
     args[:prefix] = :step unless args.key?(:prefix)
@@ -42,7 +42,7 @@ module Steppy
     end
 
     def step(method = nil, args = {}, &block) # rubocop:disable Airbnb/OptArgParameters
-      steppy_cache[:steps].push(
+      steps.push(
         Steppy.parse_step({ method: method, args: args, block: block })
       )
       self
@@ -50,18 +50,40 @@ module Steppy
     alias step_return step
 
     def step_if(condition, &block)
-      steppy_cache[:steps].push(condition: condition, block: block)
+      steps.push(condition: condition, block: block)
       self
     end
 
     def step_unless(condition, &block)
-      steppy_cache[:steps].push(condition: -> { !steppy_run_condition(condition) }, block: block)
+      steps.push(condition: -> { !steppy_run_condition(condition) }, block: block)
       self
     end
 
     def step_rescue(exceptions = nil, &block) # rubocop:disable Airbnb/OptArgParameters
       steppy_cache[:rescues].push(exceptions: exceptions, block: block)
       self
+    end
+
+    def step_if_else(condition_block, step_steps, args = {})
+      if_step, else_step = step_steps
+
+      steps.push Steppy.parse_step({
+        method: if_step,
+        args: ({
+          if: condition_block
+        }).merge(args)
+      })
+
+      steps.push Steppy.parse_step({
+        method: else_step,
+        args: ({
+          unless: condition_block
+        }).merge(args)
+      })
+    end
+
+    def steps
+      steppy_cache[:steps]
     end
 
     def steppy_cache
