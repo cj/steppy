@@ -1,3 +1,4 @@
+---
 inherit_from:
   - .rubocop_airbnb.yml
 
@@ -11,9 +12,6 @@ Style/FrozenStringLiteralComment:
   SupportedStyles:
     - always
 
-Style/StringLiterals:
-  Enabled: true
-
 AllCops:
   TargetRubyVersion: 2.5
 
@@ -23,5 +21,14 @@ Airbnb/ClassOrModuleDeclaredInWrongFile:
 Airbnb/ModuleMethodInWrongFile:
   Enabled: false
 
+Airbnb/OptArgParameters:
+  Enabled: false
+
 Lint/EndAlignment:
   EnforcedStyleAlignWith: variable
+
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+  SupportedStyles:
+    - single_quotes
+    - double_quotes

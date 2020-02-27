@@ -20,7 +20,7 @@ class Register < RegisterBase
     step(:do_admin_things) { @admin = true }
   end
 
-  step :send_welcome_email do |first_name:, last_name:, **params|
+  step :send_welcome_email do |first_name:, last_name:, **_params|
     # send email
 
     {
@@ -133,9 +133,7 @@ class SteppyTest < Minitest::Test
       include Steppy
 
       step :foo do
-        raise SteppyError, {
-          bar: 'foo',
-        }
+        raise SteppyError, bar: 'foo'
       end
     end
 
@@ -218,10 +216,10 @@ class SteppyTest < Minitest::Test
 
       attr_reader :current_user
 
-      step_if_else -> { current_user }, [
-        :initialize_current_user,
-        :initialize_anonymous_user
-      ], set: :result
+      step_if_else -> { current_user }, %i(
+        initialize_current_user
+        initialize_anonymous_user
+      ), set: :result
 
       step_return { @result }
 
@@ -238,7 +236,44 @@ class SteppyTest < Minitest::Test
       end
     end
 
-    klass.new.steppy({current_user: false}).must_equal 'anonymous_user'
-    klass.new.steppy({current_user: true}).must_equal 'current_user'
+    klass.new.steppy(current_user: false).must_equal 'anonymous_user'
+    klass.new.steppy(current_user: true).must_equal 'current_user'
+  end
+
+  test 'step callbacks' do
+    klass = Class.new do
+      include Steppy
+
+      attr_reader :current_user
+
+      step :initialize_current_user
+
+      step_before { puts 'before:global' }
+
+      step_before :initialize_current_user do |_args|
+        puts 'before:initialize_current_user'
+      end
+
+      step_after :initialize_current_user do |result|
+        puts "after:#{result}"
+      end
+
+      step_after { puts 'after:global' }
+
+      def step_initialize_current_user
+        'current_user'
+      end
+    end
+
+    output, error = capture_io do
+      klass.new.steppy
+    end
+
+    output.must_include 'before:initialize_current_user'
+    output.must_include 'before:global'
+    output.must_include 'after:current_user'
+    output.must_include 'after:global'
+
+    error.must_be_empty
   end
 end

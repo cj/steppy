@@ -7,4 +7,4 @@ git_source(:github) { |repo_name| "https://github.com/#{repo_name}" }
 # Specify your gem's dependencies in steppy.gemspec
 gemspec
 
-gem 'byebug', platforms: [:mri, :mingw, :x64_mingw]
+gem 'byebug', platforms: %i(mri mingw x64_mingw)

@@ -13,13 +13,9 @@ module Steppy
 
   # :reek:TooManyStatements
   def self.parse_step(method:, args:, block: nil)
-    if args.key?(:if)
-      args[:condition] = -> { steppy_run_condition(args[:if]) }
-    end
+    args[:condition] = -> { steppy_run_condition(args[:if]) } if args.key?(:if)
 
-    if args.key?(:unless)
-      args[:condition] = -> { !steppy_run_condition(args[:unless]) }
-    end
+    args[:condition] = -> { !steppy_run_condition(args[:unless]) } if args.key?(:unless)
 
     args[:prefix] = :step unless args.key?(:prefix)
 
@@ -41,12 +37,13 @@ module Steppy
       steppy_cache[:sets] += sets
     end
 
-    def step(method = nil, args = {}, &block) # rubocop:disable Airbnb/OptArgParameters
+    def step(method = nil, args = {}, &block)
       steps.push(
-        Steppy.parse_step({ method: method, args: args, block: block })
+        Steppy.parse_step(method: method, args: args, block: block)
       )
       self
     end
+
     alias step_return step
 
     def step_if(condition, &block)
@@ -59,7 +56,7 @@ module Steppy
       self
     end
 
-    def step_rescue(exceptions = nil, &block) # rubocop:disable Airbnb/OptArgParameters
+    def step_rescue(exceptions = nil, &block)
       steppy_cache[:rescues].push(exceptions: exceptions, block: block)
       self
     end
@@ -67,27 +64,57 @@ module Steppy
     def step_if_else(condition_block, step_steps, args = {})
       if_step, else_step = step_steps
 
-      steps.push Steppy.parse_step({
+      steps.push Steppy.parse_step(
         method: if_step,
-        args: ({
-          if: condition_block
-        }).merge(args)
-      })
+        args: {
+          if: condition_block,
+        }.merge(args)
+      )
 
-      steps.push Steppy.parse_step({
+      steps.push Steppy.parse_step(
         method: else_step,
-        args: ({
-          unless: condition_block
-        }).merge(args)
-      })
+        args: {
+          unless: condition_block,
+        }.merge(args)
+      )
+    end
+
+    def step_after(key = nil, &block)
+      step_add_callback(:after, block, key)
+    end
+
+    def step_before(key = nil, &block)
+      step_add_callback(:before, block, key)
+    end
+
+    def step_add_callback(type, block, key)
+      callback_key = key ? key.to_sym : :global
+      callbacks = step_callbacks[type][callback_key] ||= []
+      callbacks.push(block)
     end
 
     def steps
       steppy_cache[:steps]
     end
 
+    def step_callbacks
+      steppy_cache[:callbacks]
+    end
+
     def steppy_cache
-      @steppy_cache ||= SteppyCache.new(steps: [], sets: [], rescues: [])
+      @steppy_cache ||= SteppyCache.new(
+        steps: [],
+        sets: [],
+        rescues: [],
+        callbacks: {
+          before: {
+            global: [],
+          },
+          after: {
+            global: [],
+          },
+        }
+      )
     end
   end
 
@@ -95,7 +122,7 @@ module Steppy
   module InstanceMethods
     attr_reader :steppy_cache
 
-    def steppy(attributes, cache = {})
+    def steppy(attributes = {}, cache = {})
       steppy_initialize_cache({ attributes: attributes, prefix: :step }.merge(cache))
 
       if steppy_cache.key?(:block)
@@ -103,7 +130,7 @@ module Steppy
       else
         steppy_run(steppy_cache)
       end
-    rescue => exception
+    rescue StandardError => exception
       steppy_rescue exception, steppy_cache[:rescues]
     end
 
@@ -111,9 +138,10 @@ module Steppy
       steppy_sets(sets)
     end
 
-    def step(method = nil, args = {}, &block) # rubocop:disable Airbnb/OptArgParameters
-      steppy_run_step Steppy.parse_step({ method: method, args: args, block: block })
+    def step(method = nil, args = {}, &block)
+      steppy_run_step Steppy.parse_step(method: method, args: args, block: block)
     end
+
     alias step_return step
 
     def step_if(condition, &block)
@@ -159,10 +187,9 @@ module Steppy
 
     def steppy_rescue(exception, rescues)
       exception_class = exception.class
+      has_exception = exception_class == SteppyError || rescues.empty?
 
-      if exception_class == SteppyError || rescues.empty?
-        raise exception
-      end
+      raise exception if has_exception
 
       rescues.each do |exceptions:, block:|
         if !exceptions || (exceptions && !exceptions.include?(exception_class))
@@ -174,9 +201,7 @@ module Steppy
     end
 
     def steppy_run_condition_block(condition, block)
-      if steppy_run_condition(condition)
-        steppy_run(steppy_cache_from_block(block))
-      end
+      steppy_run(steppy_cache_from_block(block)) if steppy_run_condition(condition)
     end
 
     def steppy_run_condition(condition)
@@ -190,11 +215,11 @@ module Steppy
     end
 
     def steppy_run_step(method:, args:, block:)
-      if !steppy_run_condition(args[:condition]) || (
-          steppy_cache[:prefix] != args[:prefix]
-      )
+      if !steppy_run_condition(args[:condition]) || (steppy_cache[:prefix] != args[:prefix])
         return steppy_result
       end
+
+      step_callbacks(:before, method, args, args)
 
       result = if block
         instance_exec(steppy_attributes, &block)
@@ -202,9 +227,20 @@ module Steppy
         steppy_run_method(method, steppy_attributes)
       end
 
+      step_callbacks(:after, method, result, args)
+
       steppy_set(args[:set], result)
 
       result
+    end
+
+    def step_callbacks(type, method, result, args)
+      callbacks = steppy_cache[:callbacks][type]
+      method_callbacks = (callbacks[method] || [])
+
+      callbacks[:global].concat(method_callbacks).each do |callback|
+        instance_exec(result, args, &callback)
+      end
     end
 
     def steppy_run_method(method_name, attributes)
