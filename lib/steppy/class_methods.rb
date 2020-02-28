@@ -12,7 +12,7 @@ module Steppy
     end
 
     def step(method = nil, args = {}, &block)
-      steps.push(
+      steps_cache.push(
         Steppy.parse_step(method: method, args: args, block: block)
       )
       self
@@ -21,12 +21,12 @@ module Steppy
     alias step_return step
 
     def step_if(condition, &block)
-      steps.push(condition: condition, block: block)
+      steps_cache.push(condition: condition, block: block)
       self
     end
 
     def step_unless(condition, &block)
-      steps.push(condition: -> { !steppy_run_condition(condition) }, block: block)
+      steps_cache.push(condition: -> { !steppy_run_condition(condition) }, block: block)
       self
     end
 
@@ -38,14 +38,14 @@ module Steppy
     def step_if_else(condition_block, step_steps, args = {})
       if_step, else_step = step_steps
 
-      steps.push Steppy.parse_step(
+      steps_cache.push Steppy.parse_step(
         method: if_step,
         args: {
           if: condition_block,
         }.merge(args)
       )
 
-      steps.push Steppy.parse_step(
+      steps_cache.push Steppy.parse_step(
         method: else_step,
         args: {
           unless: condition_block,
@@ -57,17 +57,25 @@ module Steppy
       step_add_callback(:after, block, key)
     end
 
+    def step_after_all(&block)
+      step_add_callback(:after, block, :all)
+    end
+
     def step_before(key = nil, &block)
       step_add_callback(:before, block, key)
     end
 
+    def step_before_all(&block)
+      step_add_callback(:before, block, :all)
+    end
+
     def step_add_callback(type, block, key)
-      callback_key = key ? key.to_sym : :global
+      callback_key = key ? key.to_sym : :each
       callbacks = step_callbacks[type][callback_key] ||= []
       callbacks.push(block)
     end
 
-    def steps
+    def steps_cache
       steppy_cache[:steps]
     end
 
@@ -82,10 +90,12 @@ module Steppy
         rescues: [],
         callbacks: {
           before: {
-            global: [],
+            all: [],
+            each: [],
           },
           after: {
-            global: [],
+            all: [],
+            each: [],
           },
         }
       )

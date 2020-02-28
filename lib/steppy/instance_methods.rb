@@ -8,11 +8,17 @@ module Steppy
     def steppy(attributes = {}, cache = {})
       steppy_initialize_cache({ attributes: attributes, prefix: :step }.merge(cache))
 
-      if steppy_cache.key?(:block)
+      step_run_callbacks(:before, :all, attributes)
+
+      result = if steppy_cache.key?(:block)
         instance_exec(&steppy_cache[:block])
       else
         steppy_run(steppy_cache)
       end
+
+      step_run_callbacks(:after, :all, attributes)
+
+      result
     rescue StandardError => exception
       steppy_rescue exception, steppy_cache[:rescues]
     end
@@ -135,12 +141,14 @@ module Steppy
       result
     end
 
-    def step_run_callbacks(type, method, result, args)
+    def step_run_callbacks(type, method, result, args = result)
       callbacks = step_callbacks[type]
       method_callbacks = callbacks[method] || []
 
-      callbacks[:global].each do |callback|
-        instance_exec(result, args, &callback)
+      if method != :all
+        callbacks[:each].each do |callback|
+          instance_exec(result, args, &callback)
+        end
       end
 
       method_callbacks.each do |callback|

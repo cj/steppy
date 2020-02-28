@@ -325,6 +325,8 @@ class SteppyTest < Minitest::Test
         step :initialize_current_user
       end
 
+      step_before_all { puts 'before:all' }
+
       step_before { puts 'before:global' }
 
       step_before :initialize_current_user do |_args|
@@ -341,6 +343,7 @@ class SteppyTest < Minitest::Test
         puts 'after:does_not_exist'
       end
 
+      step_after_all { puts 'after:all' }
 
       def step_initialize_current_user
         'current_user'
@@ -351,10 +354,12 @@ class SteppyTest < Minitest::Test
       klass.new.steppy
     end
 
+    output.must_include 'before:all'
     output.must_include 'before:initialize_current_user'
     output.must_include 'before:global'
     output.must_include 'after:current_user'
     output.must_include 'after:global'
+    output.must_include 'after:all'
 
     output.wont_include 'after:does_not_exist'
 
