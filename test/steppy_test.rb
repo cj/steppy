@@ -286,7 +286,7 @@ class SteppyTest < Minitest::Test
         puts 'before:initialize_current_user'
       end
 
-      step_after :initialize_current_user do |result|
+      step_after :initialize_current_user do |_args, result|
         puts "after:#{result}"
       end
 
@@ -333,7 +333,7 @@ class SteppyTest < Minitest::Test
         puts 'before:initialize_current_user'
       end
 
-      step_after :initialize_current_user do |result|
+      step_after :initialize_current_user do |_args, result|
         puts "after:#{result}"
       end
 

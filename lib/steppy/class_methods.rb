@@ -54,22 +54,22 @@ module Steppy
     end
 
     def step_after(key = nil, &block)
-      step_add_callback(:after, block, key)
+      step_add_callback(:after, key, block)
     end
 
     def step_after_all(&block)
-      step_add_callback(:after, block, :all)
+      step_add_callback(:after, :all, block)
     end
 
     def step_before(key = nil, &block)
-      step_add_callback(:before, block, key)
+      step_add_callback(:before, key, block)
     end
 
     def step_before_all(&block)
-      step_add_callback(:before, block, :all)
+      step_add_callback(:before, :all, block)
     end
 
-    def step_add_callback(type, block, key)
+    def step_add_callback(type, key, block)
       callback_key = key ? key.to_sym : :each
       callbacks = step_callbacks[type][callback_key] ||= []
       callbacks.push(block)

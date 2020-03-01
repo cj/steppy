@@ -16,7 +16,7 @@ module Steppy
         steppy_run(steppy_cache)
       end
 
-      step_run_callbacks(:after, :all, attributes)
+      step_run_callbacks(:after, :all, attributes, result)
 
       result
     rescue StandardError => exception
@@ -126,7 +126,7 @@ module Steppy
         return steppy_result
       end
 
-      step_run_callbacks(:before, method, args, args)
+      step_run_callbacks(:before, method, args)
 
       result = if block
         instance_exec(steppy_attributes, &block)
@@ -134,25 +134,25 @@ module Steppy
         steppy_run_method(method, steppy_attributes)
       end
 
-      step_run_callbacks(:after, method, result, args)
+      step_run_callbacks(:after, method, args, result)
 
       steppy_set(args[:set], result)
 
       result
     end
 
-    def step_run_callbacks(type, method, result, args = result)
+    def step_run_callbacks(type, method, args, result = nil)
       callbacks = step_callbacks[type]
       method_callbacks = callbacks[method] || []
 
       if method != :all
         callbacks[:each].each do |callback|
-          instance_exec(result, args, &callback)
+          instance_exec(args, result, &callback)
         end
       end
 
       method_callbacks.each do |callback|
-        instance_exec(result, args, &callback)
+        instance_exec(args, result, &callback)
       end
     end
 
