@@ -74,8 +74,16 @@ module Steppy
       sets.each { |key, value| steppy_set(key, value || steppy_attributes[key]) }
     end
 
-    def steppy_set(key, value)
-      key && instance_variable_set("@#{key}", value)
+    def steppy_set(set_key, value)
+      return unless set_key
+
+      if set_key.is_a? Array
+        set_key.each_with_index do |key, index|
+          steppy_set(key, value[index])
+        end
+      else
+        instance_variable_set("@#{set_key}", value)
+      end
     end
 
     def steppy_steps(steps)

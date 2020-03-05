@@ -120,6 +120,27 @@ class SteppyTest < Minitest::Test
     klass.new.steppy({}, prefix: :filter).must_equal 'bar'
   end
 
+  test 'multiple sets' do
+    klass = Class.new do
+      include Steppy
+
+      attr_reader :set_1, :set_2
+
+      step :set_multiple, set: [:set_1, :set_2]
+
+      step_return { self }
+
+      def step_set_multiple
+        ['foo', 'bar']
+      end
+    end
+
+    response = klass.new.steppy
+
+    assert_equal 'foo', response.set_1
+    assert_equal 'bar', response.set_2
+  end
+
   test 'having no steps should not throw an error' do
     klass = Class.new do
       include Steppy
