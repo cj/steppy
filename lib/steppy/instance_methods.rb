@@ -142,9 +142,9 @@ module Steppy
         steppy_run_method(method, steppy_attributes)
       end
 
-      step_run_callbacks(:after, method, args, result)
-
       steppy_set(args[:set], result)
+
+      step_run_callbacks(:after, method, args, result)
 
       result
     end
