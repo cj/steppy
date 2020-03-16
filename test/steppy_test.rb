@@ -293,6 +293,38 @@ class SteppyTest < Minitest::Test
     klass.new.steppy(current_user: true).must_equal 'current_user'
   end
 
+  test 'step_if_else inside a step_if block' do
+    klass = Class.new do
+      include Steppy
+
+      attr_reader :current_user
+
+      step_if -> { true } do
+        step_if_else -> { current_user }, %i(
+          initialize_current_user
+          initialize_anonymous_user
+        ), set: :result
+      end
+
+      step_return { @result }
+
+      def step_initialize_current_user
+        'current_user'
+      end
+
+      def step_initialize_anonymous_user
+        'anonymous_user'
+      end
+
+      def current_user
+        steppy_attributes[:current_user]
+      end
+    end
+
+    klass.new.steppy(current_user: false).must_equal 'anonymous_user'
+    klass.new.steppy(current_user: true).must_equal 'current_user'
+  end
+
   test 'step callbacks' do
     klass = Class.new do
       include Steppy

@@ -51,6 +51,8 @@ module Steppy
           unless: condition_block,
         }.merge(args)
       )
+
+      self
     end
 
     def step_after(key = nil, &block)
