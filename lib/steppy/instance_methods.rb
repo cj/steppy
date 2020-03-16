@@ -167,7 +167,7 @@ module Steppy
     def steppy_run_method(method_name, attributes)
       method = "#{steppy_cache[:prefix]}_#{method_name}"
 
-      if method(method).arity > 0
+      if public_method(method).arity != 0
         public_send(method, attributes)
       else
         public_send(method)

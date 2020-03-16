@@ -418,4 +418,18 @@ class SteppyTest < Minitest::Test
 
     error.must_be_empty
   end
+
+  test 'default values' do
+    klass = Class.new do
+      include Steppy
+
+      step :return_bar
+
+      def step_return_bar(value: 'moo')
+        value
+      end
+    end
+
+    klass.new.steppy(value: 'foo').must_equal 'foo'
+  end
 end
